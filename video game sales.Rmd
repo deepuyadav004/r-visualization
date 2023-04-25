@@ -1,0 +1,269 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+plot(cars)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+```{r}
+library(tidyverse) #most datascience related libraries
+library(FNN) #knn regression
+library(corrplot) # correlation plot
+library(tree) # Decision Tree
+library(caret) #train control
+options(warn=-1) # filter warnings
+```
+
+```{r}
+### Importing data
+Vgsales <- read.csv("./Video_Games_Sales_as_at_22_Dec_2016.csv",sep=",",na.strings=c(""," ","NA","N/A"))
+head(Vgsales)
+```
+
+```{r}
+str(Vgsales)
+```
+
+```{r}
+na_count <-sapply(Vgsales, function(y) sum(length(which(is.na(y)))))
+na_count <- data.frame(na_count)
+na_count
+```
+
+```{r}
+#drop all NA values
+Vgsales <- na.omit(Vgsales)
+str(Vgsales)
+```
+
+```{r}
+#drop all sales except global
+Vgsales_df <- cbind(Vgsales[,-c(6:10)],Vgsales$Global_Sales)
+Vgsales_df$Year_of_Release <- 2016 - Vgsales_df$Year_of_Release
+names(Vgsales_df)[3] <- "Game_Age"
+names(Vgsales_df)[12] <- "Global_Sales"
+str(Vgsales_df)
+```
+
+```{r}
+summary(Vgsales_df)
+```
+
+```{r}
+#creating a function to control figure size
+fig <- function(width, heigth){
+     options(repr.plot.width = width, repr.plot.height = heigth)
+}
+```
+
+```{r}
+fig(20,8)
+Platform_bar <- ggplot(Vgsales_df, aes(x=Platform,fill =Platform)) + geom_bar() + theme(text = element_text(size=10))  
+Platform_bar
+```
+
+```{r}
+fig(15,8)
+Age_bar <- ggplot(Vgsales_df, aes(x=Game_Age)) + geom_bar(fill = "forestgreen") + theme(text = element_text(size=20))  
+Age_bar
+```
+
+```{r}
+fig(15,8)
+Platform_bar <- ggplot(Vgsales_df, aes(x=Genre,fill =Genre)) + geom_bar() + theme(text = element_text(size=30),axis.text.x=element_text(angle = 45,vjust = 0.4,size=10))  
+Platform_bar
+```
+
+```{r}
+fig(12, 8)
+Critic_Score_hist <- ggplot(Vgsales_df, aes(Critic_Score))
+Critic_Score_hist + geom_histogram(binwidth = 4, color = "black",fill = "gold") + theme(text = element_text(size=20))
+```
+
+```{r}
+fig(12, 8)
+Critic_Count_hist <- ggplot(Vgsales_df, aes(Critic_Count))
+Critic_Count_hist + geom_histogram(binwidth = 4, color = "black",fill = "skyblue") + theme(text = element_text(size=20))
+```
+
+```{r}
+fig(50,8)
+Vgsales_df %>% select(Name,User_Score) %>% arrange(desc(User_Score))%>% head(10)%>%
+ggplot(aes(x=Name,y=User_Score,fill=Name))+geom_bar(stat="identity")+
+theme(text = element_text(size=10),legend.position="right",axis.text.x=element_text(angle = 90,vjust = 0.5,hjust = 1,size=5))+labs(x="Game",y="User Scores",title="Top 10 user score games")+scale_fill_brewer(palette="PRGn")
+```
+
+```{r}
+fig(12, 8)
+User_Count_Count_hist <- ggplot(Vgsales_df, aes(User_Count))
+User_Count_Count_hist + geom_histogram(color = "black",fill = "pink") + theme(text = element_text(size=20))
+```
+
+```{r}
+fig(15,8)
+Rating_bar <- ggplot(Vgsales_df, aes(x=Rating,fill =Rating)) + geom_bar() + theme(text = element_text(size=20))  
+Rating_bar
+```
+
+```{r}
+fig(12, 8)
+Global_Sales_hist <- ggplot(Vgsales_df, aes(Global_Sales))
+Global_Sales_hist + geom_histogram(binwidth = 2, color = "black",fill = "firebrick1") + theme(text = element_text(size=20))
+```
+
+```{r}
+### Multivariate plots
+fig(20,8)
+sales_by_platform <- ggplot(Vgsales_df, aes(Platform,Global_Sales,fill =Platform))
+sales_by_platform +geom_bar(stat = "identity") + 
+theme(text = element_text(size=10),legend.position="right",axis.text.x=element_text(angle = 90,vjust = 0.5,hjust = 1,size=10))+labs(x="Platform",y="Global Sales",title="Sales by Platform")
+```
+
+```{r}
+Vgsales_df %>% select(Publisher,Global_Sales)%>%group_by(Publisher)%>%
+summarise(Total_sales=sum(Global_Sales))%>%arrange(desc(Total_sales))%>% head(10)%>%
+ggplot(aes(x=Publisher,y=Total_sales,fill=Publisher))+geom_bar(stat="identity")+
+theme(text = element_text(size=10),legend.position="right",axis.text.x=element_text(angle = 90,vjust = 0.5,hjust = 1,size=10))+labs(x="Publisher",y="Global Sales",title="Top 10 Publishers")+scale_fill_brewer(palette="Paired")
+```
+
+```{r}
+fig(20,8)
+Vgsales_df %>% select(Developer,Global_Sales)%>%group_by(Developer)%>%
+summarise(Total_sales=sum(Global_Sales))%>%arrange(desc(Total_sales))%>% head(10)%>%
+ggplot(aes(x=Developer,y=Total_sales,fill=Developer))+geom_bar(stat="identity")+
+theme(text = element_text(size=20),legend.position="right",axis.text.x=element_text(angle = 90,vjust = 0.5,hjust = 1,size=10))+labs(x="Developer",y="Global Sales",title="Top 10 selling Developers")+scale_fill_brewer(palette="PuOr")
+```
+
+```{r}
+Vgsales_df %>% select(Name,Global_Sales) %>% arrange(desc(Global_Sales))%>% head(10)%>%
+ggplot(aes(x=Name,y=Global_Sales,fill=Name))+geom_bar(stat="identity")+
+theme(text = element_text(size=20),legend.position="right",axis.text.x=element_text(angle = 90,vjust = 0.5,hjust = 1,size=10))+labs(x="Developer",y="Total Sales",title="Top 10 selling Developers")+labs(x="Game",y="Global Sales",title="Top 10 selling games")+scale_fill_brewer(palette="Spectral")
+```
+
+```{r}
+Gs <- ggplot(Vgsales_df, aes(Game_Age,Global_Sales))
+Gs + geom_jitter(color = "darkviolet") + theme(text = element_text(size = 20))
+```
+
+```{r}
+Cs <- ggplot(Vgsales_df, aes(Critic_Score,Global_Sales))
+Cs + geom_jitter(color = "darkblue") + theme(text = element_text(size = 20))
+```
+
+```{r}
+Ccs <- ggplot(Vgsales_df, aes(Critic_Count,Global_Sales))
+Ccs + geom_jitter(color = "red") + theme(text = element_text(size = 20))
+```
+
+```{r}
+Us <- ggplot(Vgsales_df, aes(User_Count,Global_Sales))
+Us + geom_jitter(color = "orange") + theme(text = element_text(size = 20))
+```
+\\-------------------------------------------------------------------------------------------------------------------------------------
+
+
+Statistical Models For Regression
+KNN Regressor
+The steps for making this knn model:
+
+creating a copy of the dataset.
+converting all X variables that are factors to numeric
+scaling all the X variables.
+using linear regression for each x to y for feature selection
+using mse to decide the best k for the model.
+cross validation.
+
+```{r}
+## Data preprocessing
+#df copy
+lr.df <- Vgsales_df
+str(lr.df)
+```
+
+```{r}
+set.seed(5)
+train.size <- floor(0.7*nrow(lr.df))
+train.index <- sample(1:nrow(lr.df),train.size, replace = F)
+train.set <- lr.df[train.index,]
+test.set <- lr.df[-train.index,]
+```
+
+```{r}
+## first Model
+reg1 <- lm(Global_Sales ~., data = test.set)
+predicted1 = predict(reg1, newdata = test.set)
+Mse = mean((test.set$Global_Sales - predicted1)^2)
+cat("Mse = ",Mse)
+```
+
+```{r}
+## Model improvement
+lr.df1 <- lr.df 
+lr.df1$Platform <- as.numeric(lr.df1$Platform)
+lr.df1$Genre <- as.numeric(lr.df1$Genre)
+lr.df1$Publisher <- as.numeric(lr.df1$Publisher)
+lr.df1$User_Score <- as.numeric(lr.df1$User_Score)
+lr.df1$Developer <- as.numeric(lr.df1$Developer)
+lr.df1$Rating <- as.numeric(lr.df1$Rating)
+Vgs.cor = cor(lr.df1)
+corrplot(Vgs.cor,method = "pie")
+```
+
+
+```{r}
+reg2 <- lm(Global_Sales ~Critic_Score + Critic_Count + User_Count, data = train.set)
+summary(reg2)
+```
+```{r}
+predicted2 = predict(reg2, newdata = test.set)
+Mse = mean((test.set$Global_Sales - predicted2)^2)
+cat("Mse = ",Mse)
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(reg2)
+```
+
+```{r}
+reg3 = lm(Global_Sales ~Platform + Game_Age + Genre + Critic_Score +Critic_Count + User_Count + Rating, data = train.set)
+summary(reg3)
+```
+```{r}
+predicted = predict(reg3, newdata = test.set)
+Mse = mean((test.set$Global_Sales - predicted)^2)
+cat("Mse = ",Mse)
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(reg3)
+```
+
+```{r}
+# Define training control
+train.control <- trainControl(method = "cv", number = 3)
+
+model <- train(Global_Sales ~., data = lr.df, method = "lm",
+               trControl = train.control)
+# Summarize the results
+print(model)
+```
+
+```{r}
+lr.mae <- 0.79
+lr.mse <- 1.66
+```
+
